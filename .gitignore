@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+venv/
+.venv/
+env/
+
+uploaded_papers/*
+!uploaded_papers/.gitkeep
+
+vector_db/*
+!vector_db/.gitkeep
+
+.env
+
+.DS_Store
+Thumbs.db
