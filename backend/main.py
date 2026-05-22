@@ -3,6 +3,7 @@ import shutil
 import os
 
 from backend.pdf_parser import extract_text_from_pdf
+from backend.chunker import chunk_text
 
 
 app = FastAPI(
@@ -30,7 +31,7 @@ def home():
 @app.post("/upload-pdf")
 async def upload_pdf(file: UploadFile = File(...)):
     """
-    Upload a PDF file, save it locally, and extract text from it.
+    Upload a PDF file, save it locally, extract text, and split it into chunks.
     """
 
     # Keep filename safe
@@ -42,11 +43,16 @@ async def upload_pdf(file: UploadFile = File(...)):
     with open(file_path, "wb") as buffer:
         shutil.copyfileobj(file.file, buffer)
 
-    # Extract text from saved PDF
+    # Extract full text from PDF
     extracted_text = extract_text_from_pdf(file_path)
+
+    # Split extracted text into chunks
+    chunks = chunk_text(extracted_text)
 
     return {
         "filename": safe_filename,
         "total_characters": len(extracted_text),
+        "total_chunks": len(chunks),
+        "first_chunk_preview": chunks[0][:500] if chunks else "",
         "text_preview": extracted_text[:1000]
     }
