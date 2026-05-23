@@ -1,32 +1,38 @@
-def chunk_text(text, chunk_size=1000, overlap=200):
-    """
-    Splits long text into smaller chunks.
+import re
 
-    chunk_size = maximum characters in one chunk
-    overlap = repeated characters between chunks
-              so context is not lost between chunks
+
+def clean_text(text):
+    """
+    Cleans extra spaces and broken formatting from extracted PDF text.
+    """
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def chunk_text(text, chunk_size=180, overlap=40):
+    """
+    Splits text into word-based chunks instead of character-based chunks.
+
+    chunk_size = number of words in one chunk
+    overlap = repeated words between chunks
     """
 
+    text = clean_text(text)
+
+    words = text.split()
     chunks = []
 
-    # Start from beginning of text
     start = 0
 
-    while start < len(text):
-        # End position of current chunk
+    while start < len(words):
         end = start + chunk_size
 
-        # Extract chunk
-        chunk = text[start:end]
+        chunk_words = words[start:end]
+        chunk = " ".join(chunk_words)
 
-        # Remove extra spaces/newlines
-        chunk = chunk.strip()
-
-        # Add chunk only if it has content
         if chunk:
             chunks.append(chunk)
 
-        # Move forward but keep some overlap
         start = end - overlap
 
     return chunks
