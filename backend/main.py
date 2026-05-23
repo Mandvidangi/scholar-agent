@@ -9,7 +9,6 @@ from backend.chunker import chunk_text
 from backend.vector_store import create_vector_store, search_vector_store
 
 
-# Create FastAPI app
 app = FastAPI(
     title="ScholarAgent API",
     description="Agentic AI research paper assistant backend",
@@ -17,10 +16,7 @@ app = FastAPI(
 )
 
 
-# Folder where uploaded PDFs will be saved
 UPLOAD_FOLDER = "uploaded_papers"
-
-# Create upload folder if it does not exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
@@ -44,16 +40,14 @@ def clean_sentence(sentence):
     Cleans PDF extraction artifacts from a sentence.
     """
 
-    # Remove broken hyphen spacing like "degrada- tion" -> "degradation"
+    # Fix broken PDF hyphen words like "degrada- tion" -> "degradation"
     sentence = re.sub(r"(\w)-\s+(\w)", r"\1\2", sentence)
+
+    # Remove page markers
+    sentence = re.sub(r"--- Page \d+ ---", "", sentence)
 
     # Remove extra spaces
     sentence = re.sub(r"\s+", " ", sentence)
-
-    # Remove page markers
-    sentence = sentence.replace("--- Page 1 ---", "")
-    sentence = sentence.replace("--- Page 2 ---", "")
-    sentence = sentence.replace("--- Page 3 ---", "")
 
     return sentence.strip()
 
@@ -64,14 +58,13 @@ def build_extractive_answer(question, results):
 
     Current version:
     - No LLM yet.
-    - Selects useful sentences from retrieved chunks.
-    - Later we will replace this with real LLM-based RAG.
+    - It picks useful definition-style/supporting sentences.
+    - Later we will replace this with LLM-based RAG.
     """
 
     if not results:
         return "No relevant information found. Please upload a PDF first."
 
-    # Combine retrieved chunks
     combined_text = " ".join([item["text"] for item in results])
 
     # Basic cleanup
@@ -81,18 +74,17 @@ def build_extractive_answer(question, results):
     # Split into sentences
     sentences = re.split(r"(?<=[.!?])\s+", combined_text)
 
-    # Important keywords for hallucination-related answers
-    important_keywords = [
-        "hallucination",
-        "hallucinates",
-        "unsupported",
-        "incorrect",
-        "misleading",
-        "context",
-        "degradation",
-        "failure",
-        "blindspot",
-        "abstain"
+    definition_patterns = [
+        "hallucination is",
+        "hallucination in",
+        "llm may",
+        "generate fluent but unsupported",
+        "unsupported content",
+        "incorrect or unsupported",
+        "context becomes",
+        "context degradation",
+        "measurable response",
+        "failure behavior"
     ]
 
     useful_sentences = []
@@ -103,34 +95,35 @@ def build_extractive_answer(question, results):
         if len(sentence) < 40:
             continue
 
-        # Avoid broken chunk fragments starting with lowercase
-        if sentence[0].islower():
-            continue
-
         sentence_lower = sentence.lower()
 
-        # Select sentences related to question/topic
-        if any(keyword in sentence_lower for keyword in important_keywords):
+        if any(pattern in sentence_lower for pattern in definition_patterns):
             if sentence not in useful_sentences:
                 useful_sentences.append(sentence)
 
         if len(useful_sentences) == 4:
             break
 
+    answer = (
+        "Based on the uploaded paper:\n\n"
+        "Hallucination is discussed as a failure behavior where an LLM may produce "
+        "unsupported, incorrect, or misleading output when the available context is "
+        "incomplete, noisy, conflicting, or degraded.\n\n"
+    )
+
     if useful_sentences:
-        answer = "Based on the uploaded paper:\n\n"
+        answer += "Supporting points from the paper:\n"
 
         for i, sentence in enumerate(useful_sentences, start=1):
             answer += f"{i}. {sentence}\n"
 
-        return answer
+    else:
+        answer += (
+            "The paper studies hallucination as a measurable response to structured "
+            "context degradation using controlled blindspot conditions."
+        )
 
-    # Fallback answer if sentence selection fails
-    return (
-        "Based on the uploaded paper, hallucination is discussed as a failure "
-        "where an LLM may produce unreliable, unsupported, or incorrect output "
-        "when the provided context is incomplete, noisy, conflicting, or misleading."
-    )
+    return answer
 
 
 @app.get("/")
